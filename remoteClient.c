@@ -105,6 +105,8 @@ Questions
 -Are we allowed to store local command execution output to a file and then read it and send it?
 (Create and delete file in remoteServer folder, casuse last time in bash it was not assured )
 
+- UDP by default assures us that any package could be lost. Do we have to think that a package could not be succesfully sent to the server?
+
 
 
 */

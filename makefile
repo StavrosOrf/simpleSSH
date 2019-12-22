@@ -1,5 +1,4 @@
 CC=gcc
-CFLAGS=-I.
 
 all: remoteServer remoteClient
 

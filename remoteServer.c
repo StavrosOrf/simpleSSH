@@ -25,6 +25,7 @@ void accept_commands(int sockfd,int pipeWrite)
     char buff[MAX]; 
     char tmpBuff[MAX];
     int n,i; 
+
     fd_set active_fd_set,read_fd_set;
     struct sockaddr_in clientname;
     size_t size;
@@ -76,6 +77,7 @@ void accept_commands(int sockfd,int pipeWrite)
 			        // TODO parse each line and determine the correct command
 			        //while()
 			       
+
 			  		printf("Written %d bytes from fd %d: %s\n ", write(pipeWrite,tmpBuff,BUF_SIZE),i,tmpBuff );
 
 			        // and send that buffer to client 
@@ -111,7 +113,8 @@ int main(int argc, char *argv[]) {
 	pid_t  pid;
 	pid_t  ppid = getpid();
 	int p[2],nbytes;
-	extern int make_socket(uint16_t port);
+
+	//extern int make_socket(uint16_t port);
 
 	char inbuf[120]; 
 
@@ -178,7 +181,7 @@ int main(int argc, char *argv[]) {
 	        printf("Socket successfully binded..\n"); 
 	  
 	    // Now server is ready to listen and verification 
-	    if ((listen(sockfd, MAX_NUMBER_OF_CLIENTS_IN_QUEUE)) != 0) { 
+	    if ((listen(sockfd, 1)) != 0) { 
 	        printf("Listen failed...\n"); 
 	        exit(0); 
 	    } 
@@ -249,9 +252,18 @@ int main(int argc, char *argv[]) {
 		    }
 		    
 		    //TODO Read and send output back to client
+
+		    // send instruction number  and packet number along with 504 bytes of data
 		    while (fgets(path, sizeof(path), fp) != NULL) {
     			printf("%s", path);
   			}
+
+
+  			int clientPort = 0;
+  			int instructionNumber = 0;
+  			//TODO kallinteris enstablish udp connection on variables
+  			// and send 512 bytes of whatever 
+
 
 		    pclose(fp);
         	

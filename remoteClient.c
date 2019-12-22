@@ -46,8 +46,20 @@ int main(int argc, char *argv[])
 	unsigned int receivePORT = (uintptr_t)atoi(argv[3]);
 	char* inputFileWithCommands = argv[4];
 
+	pid_t ppid = getpid();
+	printf("Parent pid %d \n", getpid() );
 
 
+	fork();
+
+	if(getpid() == ppid){
+		//TODO KALLINTERIS create udp connection and receive data (512 bytes)
+		//and write each instruction to a tmp file, consider that every instruction returns at max 512 bytes
+
+		// dont exit ,just wait for data
+ 
+	}else{
+		printf("PID = %d and pid = %d\n",getpid(), pid);
 
 	if(argc == 1 || argc >5){
 		printf("Wrong number of arguments\n");
@@ -87,6 +99,8 @@ int main(int argc, char *argv[])
   
     // close the socket 
     close(sockfd); 
+	}
+	
 } 
 
 
@@ -101,9 +115,6 @@ Questions
 	while the kid sends the commands to the server and then terminate ?
 
 -Mutex allowed for pipe synchronization ?( though i dont think it is necessary to use them)
-
--Are we allowed to store local command execution output to a file and then read it and send it?
-(Create and delete file in remoteServer folder, casuse last time in bash it was not assured )
 
 - UDP by default assures us that any package could be lost. Do we have to think that a package could not be succesfully sent to the server?
 

@@ -12,31 +12,33 @@
 #include <netdb.h>
 #include <errno.h>
 
-#define MAX_NUMBER_OF_CLIENTS_IN_QUEUE 100	
+#define NUMBER_OF_COMMANDS_TO_SEND 10
+#define BUFFER_SIZE NUMBER_OF_COMMANDS_TO_SEND*101 + 6 + 11 
 #define SA struct sockaddr
 #define MAX 10*100 
 #define MAX_COUNT  200
-#define BUF_SIZE   100
+#define PIPE_BUFFER_SIZE   118
 
 
 // Function designed for chat between client and server. 
 void accept_commands(int sockfd,int pipeWrite) 
 { 
-    char buff[MAX]; 
-    char tmpBuff[MAX];
-    int n,i; 
+    char buffer[BUFFER_SIZE]; 
+    char pipeBuffer[PIPE_BUFFER_SIZE];
+    int n,i,j,k,l,instrNumber;
+
+    int instructionsSent[FD_SETSIZE]; 
 
     fd_set active_fd_set,read_fd_set;
     struct sockaddr_in clientname;
-    size_t size;
+    int size,counter;
+    char clientPort[6],strInstrNumber[11];
 
  	FD_ZERO(&active_fd_set);
     FD_SET (sockfd,&active_fd_set);
-
-
-    // infinite loop for chat 
+ 
     while (1) { 
-        bzero(buff, MAX); 
+        bzero(buffer, sizeof(buffer)); 
         //printf("Sockets size %d socket: %d\n",FD_SETSIZE , sockfd);
 
         printf("=====================\n");
@@ -54,40 +56,84 @@ void accept_commands(int sockfd,int pipeWrite)
         			int new;
         			size = sizeof(clientname);
         			new = accept(sockfd,(SA*) &clientname,&size);
+
+        			instructionsSent[new] = 0;
         			printf("new Connection %d \n",new);
         			if(new < 0){
         				exit(EXIT_FAILURE);
         			}
-        			//fprintf(stderr, "Server : connect from host %s ,port %hd.\n",inet_ntoa(clientname.sin_addr),ntohs(clientname.sin_port) );
         			FD_SET(new,&active_fd_set);
+        		
         		}else{
         			//socket is already connected
 
+        			bzero(pipeBuffer, sizeof(pipeBuffer)); 
+        			bzero(buffer, sizeof(buffer)); 
+
 			        // read the message from client and copy it in buffer
-			        // read(sockfd, buff, sizeof(buff)); 
-			        read(i, buff, sizeof(buff)); 
+			        read(i, buffer, sizeof(buffer)); 
+
+			        //if socket was disconnected 
+			        if(buffer[0] == '\0'){
+			        	printf("--Socket %d closed...\n", i); 
+			            close(i);
+        				FD_CLR(i,&active_fd_set);
+        				instructionsSent[i] = 0;
+			        }
+
+			        
+			        for(j = 0; j < 6 ;j++){
+			        	pipeBuffer[j] = buffer[j];
+			        }
+
+			        strncpy(strInstrNumber,&buffer[6],10);
+			        instrNumber = atoi(strInstrNumber);
+
+			        counter = instructionsSent[i];
+
+			        for(k = 0; k < instrNumber ; k++){
+			        	sprintf(strInstrNumber,"%10u",counter);
+			        	strcpy(&pipeBuffer[7],strInstrNumber);
+
+			        	// printf("Command --: %s\t \n", &buffer[instrNumber*101 + 17]);
+			        	// strncpy(&pipeBuffer[17],&buffer[instrNumber*101 + 17],101);
+
+			        	l = 17;
+			        	for(j = k*101 + 17 ; j < (k+1)*101 + 17; j++ ){
+			        		pipeBuffer[l] = buffer[j];
+			        		l++;
+			        	}
+
+				    	for(j=0;j<PIPE_BUFFER_SIZE;j++){
+				    		printf("%c",pipeBuffer[j]);
+				    	}
+				    	printf("\n");
+
+				    	write(pipeWrite,pipeBuffer,PIPE_BUFFER_SIZE);
+				    	//printf("Written %ld bytes from fd %d:%s\n ", write(pipeWrite,pipeBuffer,PIPE_BUFFER_SIZE),i,&pipeBuffer[17] );
+
+			        	counter++;
+			        }
 			        // print buffer which contains the client contents 
-			        printf("From client: %s\t \n", buff); 
-			        strcpy(tmpBuff,buff);
-			        bzero(buff, MAX); 
+			        // printf("From client: %s\t \n", &buffer[1]); 
+			        // printf("From client2: %s\t \n", &buffer[17]);
+			        // printf("From client3: %s\t \n", &buffer[17+101]);  
+			    	
+
+			        
 			        n = 0; 
 
+			        instructionsSent[i] += instrNumber;
 			         
 			        // TODO Write each unique command into the pipe using 100 bytes windows (to be implemented soon)
 			        // TODO parse each line and determine the correct command
 			        //while()
 			       
 
-			  		printf("Written %d bytes from fd %d: %s\n ", write(pipeWrite,tmpBuff,BUF_SIZE),i,tmpBuff );
+			  		
 
-			        // and send that buffer to client 
-			        write(i, "OK \n", sizeof(buff)); 
-
-			  		// while(1){
-			  		// 	;
-			  		// }
 			        // if msg contains "Exit" then server exit and chat ended. 
-			        if (strncmp("exit", buff, 4) == 0) { 
+			        if (strncmp("exit", buffer, 4) == 0) { 
 			            
 			            printf("Server Exit...\n"); 
 			            close(i);
@@ -95,7 +141,7 @@ void accept_commands(int sockfd,int pipeWrite)
 			             
 			        }         			
 
-        			//no more data
+        			
 
         		}
 
@@ -114,9 +160,7 @@ int main(int argc, char *argv[]) {
 	pid_t  ppid = getpid();
 	int p[2],nbytes;
 
-	//extern int make_socket(uint16_t port);
-
-	char inbuf[120]; 
+	char inbuf[PIPE_BUFFER_SIZE]; 
 
 	//Create Pipe
 
@@ -189,24 +233,7 @@ int main(int argc, char *argv[]) {
 	        printf("Server listening..\n"); 
 	    len = sizeof(client); 
 	  	printf("sockfd socket %d\n",sockfd );
-	    //Accept the data packet from client and verification 
-	    // connfd = accept(sockfd, (SA*)&client, &len);
-	    // printf("CONN socket %d\n",connfd );
-	    // if (connfd < 0) { 
-	    //     printf("server acccept failed...\n"); 
-	    //     exit(0); 
-	    // } 
-	    // else
-	    //     printf("server acccept the client...\n"); 
-	  
-	    // Function for chatting between client and server 
 
-
-	    //sockfd = make_socket(serverPort);
-	    // if(listen(sockfd,1) <0){
-	    // 	perror("listen");
-	    // 	exit(EXIT_FAILURE);
-	    // }
 	    accept_commands(sockfd,p[1]); 
 	  
 	    // After chatting close the socket 
@@ -214,38 +241,31 @@ int main(int argc, char *argv[]) {
 
     }else{//if child wait parent for commands
     	
-    	char tempfileName[16] = "";
+    	char tmp1[6],tmp2[11];
     	char path[1035];
-
-    	// sprintf(tempfileName,"%d",getpid());
-    	// strcat(tempfileName,".txt");
-    	// printf("tmp file name :%s\n",tempfileName);
+    	int instrNumber,clientPort ;
 
     	FILE *fp;
     	
-
-    	//strcat(tempfileName,)
     	while(1){
-
-    		while ((nbytes = read(p[0], inbuf, BUF_SIZE)) > 0) {
-    			printf("Child %d read %d bytes and  says %s\n",getpid(),nbytes, inbuf);
+    		bzero(inbuf,sizeof(inbuf));
+    		while ((nbytes = read(p[0], inbuf, PIPE_BUFFER_SIZE)) > 0) {
+    			printf("Child %d read %d bytes and  says %s\n",getpid(),nbytes, &inbuf[17]);
             	break; 
     		}
 
-    		//TODO set up client udp connection variables (port,address)
-    		int clientPort = 8082;
+    		strncpy(tmp2,&inbuf[7],10);
+    		int i;
+    		
+			instrNumber = atoi(tmp2);
+    		
+			strncpy(tmp1,inbuf,6);
 
-    		// strtok(inbuf,"\n");
-      //       //we redirect command output to a file 
-    		// sprintf(inbuf,"%s >> %s",inbuf,tempfileName);
-      //   	printf("Child %d Finished reading the command %s\n",getpid(),inbuf);
-
-      //   	system(inbuf); // inbuf + ">> tmp.childpid.txt"
-
+			clientPort = atoi(tmp1);
 
         	//other approach
 
-        	fp = popen(inbuf, "r");
+        	fp = popen(&inbuf[17], "r");
 		  	if (fp == NULL) {
 		    	printf("Failed to run command\n" );
 		    	exit(1);
@@ -255,12 +275,13 @@ int main(int argc, char *argv[]) {
 
 		    // send instruction number  and packet number along with 504 bytes of data
 		    while (fgets(path, sizeof(path), fp) != NULL) {
-    			printf("%s", path);
+    			printf("Child %d command %d to port %d: %s", getpid(),instrNumber,clientPort,path);
   			}
 
 
-  			int clientPort = 0;
-  			int instructionNumber = 0;
+  			
+  			
+
   			//TODO kallinteris enstablish udp connection on variables
   			// and send 512 bytes of whatever 
 

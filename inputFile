@@ -1,0 +1,17 @@
+ls
+cat inputFile | tr "[:lower:]" "[:upper:]"
+ls asdasd
+ls ..
+echo hi
+echo asdas
+echo asdasd
+echo asda3
+echo asda4
+echo asda5asda5asda5asda5asda5asda5asda5asda5asda5asda5asda5asda5asda5asda5asda5asda5asda5asda5asda5asda5asda5asda5asda5asda5asda5
+echo asda6
+
+echo asda37
+echo asda8
+echo asda9
+echo asda310
+echo asda5asda5asda5asda5asda5asda5asda5asda5asda5asda5asda5asda5asda5asda5asda5asda5asda5asda5asda5asda5asda5asda5asda5asda5asda5

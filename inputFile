@@ -15,3 +15,10 @@ echo asda8
 echo asda9
 echo asda310
 echo asda5asda5asda5asda5asda5asda5asda5asda5asda5asda5asda5asda5asda5asda5asda5asda5asda5asda5asda5asda5asda5asda5asda5asda5asda5
+
+ls -alR /etc/
+cut -f1,3 koko | tr ‘:’ ‘ ’
+cut -f1,3 koko; rm -i kokoDir
+rm -i kokoDir; cut -f1,3 koko
+ls -alR /etc/ | rm -i
+timeToStop

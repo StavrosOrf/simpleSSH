@@ -11,15 +11,61 @@
 #include <limits.h>
 #include <netdb.h>
 #include <errno.h>
+#include <sys/wait.h>
+#include <ctype.h>
 
 #define NUMBER_OF_COMMANDS_TO_SEND 10
 #define BUFFER_SIZE NUMBER_OF_COMMANDS_TO_SEND*101 + 6 + 11 
-#define SA struct sockaddr
+#define SOCKET struct sockaddr
 #define MAX 10*100 
 #define MAX_COUNT  200
 #define PIPE_BUFFER_SIZE   118
+char* COMMANDS[5] = {"ls","cut","tr","cat","grep"};
+pid_t ppid;
+int * childrenPID;
+unsigned int numberOfChilds;
+
+void signal_handlerEnd(int sig){
+		
+	for(int i = 0; i<FD_SETSIZE;i++){
+		if(i != 2){
+			close(i);			
+		}
 
 
+	}
+	fprintf(stderr,"Terminated process with pid : %d  \n", getpid());
+	close(2);
+	exit(0);
+}
+
+void signal_handlerStop(int sig){
+	//printf("Pid : %d Signal Stop\n",getpid() );
+	int status = 0;
+
+	//if parent, wait for all children to exit
+	if(ppid == getpid()){
+        for(int i = 0 ; i < numberOfChilds; i++){
+    		kill(childrenPID[i],SIGUSR2);
+    	}
+
+		while(wait(&status) > 0); 
+	}
+	
+	
+
+	for(int i = 0; i<FD_SETSIZE;i++){
+		if(i != 2){
+			close(i);			
+	}
+
+
+	}
+	fprintf(stderr,"Terminated process with pid : %d  \n", getpid());
+	close(2);
+	exit(0);
+
+}
 // Function designed for chat between client and server. 
 void accept_commands(int sockfd,int pipeWrite) 
 { 
@@ -55,7 +101,7 @@ void accept_commands(int sockfd,int pipeWrite)
         		if( i == sockfd){
         			int new;
         			size = sizeof(clientname);
-        			new = accept(sockfd,(SA*) &clientname,&size);
+        			new = accept(sockfd,(SOCKET*) &clientname,&size);
 
         			instructionsSent[new] = 0;
         			printf("new Connection %d \n",new);
@@ -95,9 +141,6 @@ void accept_commands(int sockfd,int pipeWrite)
 			        	sprintf(strInstrNumber,"%10u",counter);
 			        	strcpy(&pipeBuffer[7],strInstrNumber);
 
-			        	// printf("Command --: %s\t \n", &buffer[instrNumber*101 + 17]);
-			        	// strncpy(&pipeBuffer[17],&buffer[instrNumber*101 + 17],101);
-
 			        	l = 17;
 			        	for(j = k*101 + 17 ; j < (k+1)*101 + 17; j++ ){
 			        		pipeBuffer[l] = buffer[j];
@@ -114,33 +157,10 @@ void accept_commands(int sockfd,int pipeWrite)
 
 			        	counter++;
 			        }
-			        // print buffer which contains the client contents 
-			        // printf("From client: %s\t \n", &buffer[1]); 
-			        // printf("From client2: %s\t \n", &buffer[17]);
-			        // printf("From client3: %s\t \n", &buffer[17+101]);  
-			    	
 
-			        
 			        n = 0; 
 
 			        instructionsSent[i] += instrNumber;
-			         
-			        // TODO Write each unique command into the pipe using 100 bytes windows (to be implemented soon)
-			        // TODO parse each line and determine the correct command
-			        //while()
-			       
-
-			  		
-
-			        // if msg contains "Exit" then server exit and chat ended. 
-			        if (strncmp("exit", buffer, 4) == 0) { 
-			            
-			            printf("Server Exit...\n"); 
-			            close(i);
-        				FD_CLR(i,&active_fd_set);
-			             
-			        }         			
-
         			
 
         		}
@@ -153,15 +173,18 @@ void accept_commands(int sockfd,int pipeWrite)
 
 int main(int argc, char *argv[]) {
 
-	unsigned int numberOfChilds = (uintptr_t)atoi(argv[2]);
+	numberOfChilds = (uintptr_t)atoi(argv[2]);
 	unsigned int serverPort = (uintptr_t)atoi(argv[1]);
 
 	pid_t  pid;
-	pid_t  ppid = getpid();
+	ppid = getpid();
 	int p[2],nbytes;
 
 	char inbuf[PIPE_BUFFER_SIZE]; 
 
+	// link signal handlers
+	signal(SIGUSR2,signal_handlerStop);
+	signal(SIGUSR1,signal_handlerEnd);
 	//Create Pipe
 
 	if(pipe(p) != 0){
@@ -170,7 +193,7 @@ int main(int argc, char *argv[]) {
 	}
 	signal(SIGPIPE, SIG_IGN);
 
-	printf("Parent pid %d %d\n", ppid,PIPE_BUF );
+	printf("Parent pid %d \n", ppid );
 
 	if(argc == 1 || argc >3){
 		printf("Wrong number of arguments\n");
@@ -182,23 +205,27 @@ int main(int argc, char *argv[]) {
 		exit(1);
 	}
 
+	childrenPID = malloc(sizeof(int)*numberOfChilds);
 
-
-    int i = 0;
+    int i = 0,k;
     //Create child processes
     for(i = 0 ; i < numberOfChilds; i++){
-    	fork();
+    	k = fork();
     	//printf("%d %d\n", getpid(),numberOfChilds);
+
     	if(getpid() != ppid ){
     		break;
     	}
+    	childrenPID[i] = k;
     }
 
-    //printf("Out %d parent is %d\n", getpid(),getppid());
+
+
 
     //if parent wait for clients' commands
     if(getpid() == ppid){
 
+    	
     	int sockfd, connfd, len; 
     	struct sockaddr_in servaddr, client; 
 
@@ -217,7 +244,7 @@ int main(int argc, char *argv[]) {
 	    servaddr.sin_port = htons(serverPort); 
 
 	     // Binding newly created socket to given IP and verification 
-	    if ((bind(sockfd, (SA*)&servaddr, sizeof(servaddr))) != 0) { 
+	    if ((bind(sockfd, (SOCKET*)&servaddr, sizeof(servaddr))) != 0) { 
 	        printf("socket bind failed...\n"); 
 	        exit(0); 
 	    }
@@ -232,7 +259,6 @@ int main(int argc, char *argv[]) {
 	    else
 	        printf("Server listening..\n"); 
 	    len = sizeof(client); 
-	  	printf("sockfd socket %d\n",sockfd );
 
 	    accept_commands(sockfd,p[1]); 
 	  
@@ -241,31 +267,112 @@ int main(int argc, char *argv[]) {
 
     }else{//if child wait parent for commands
     	
-    	char tmp1[6],tmp2[11];
+    	char tmp1[6],tmp2[11],tmp3[PIPE_BUFFER_SIZE],tmp4[PIPE_BUFFER_SIZE],tmp5[PIPE_BUFFER_SIZE],finalCmd[PIPE_BUFFER_SIZE];
     	char path[1035];
     	int instrNumber,clientPort ;
+    	char* token;
+    	char* token2;
+    	char* token3;
+    	char **saveptr1, **saveptr2, **saveptr3;
+    	const char d[2] = ";",d1[2] = "|",d2[2] = " ";
+    	int n,i,flag;
 
     	FILE *fp;
     	
     	while(1){
+    		start:
+    		n = 0;
     		bzero(inbuf,sizeof(inbuf));
+    		//printf("Process %d ,Gonna block\n",getpid());
     		while ((nbytes = read(p[0], inbuf, PIPE_BUFFER_SIZE)) > 0) {
-    			printf("Child %d read %d bytes and  says %s\n",getpid(),nbytes, &inbuf[17]);
+    			printf("Child %d read %d bytes and says %s\n",getpid(),nbytes, &inbuf[17]);
             	break; 
     		}
 
+    		strncpy(tmp4,&inbuf[17],100);
+    		//printf("test1\n");
     		strncpy(tmp2,&inbuf[7],10);
-    		int i;
-    		
+    		//printf("test2\n");
 			instrNumber = atoi(tmp2);
-    		
+    		//printf("test3\n");
 			strncpy(tmp1,inbuf,6);
-
+			//printf("test4\n");
 			clientPort = atoi(tmp1);
+			//printf("tokensInbuf:%s-\n",&inbuf[17] );
+			//printf("tokens:%s-\n",tmp4 );
 
-        	//other approach
+        	//Edit commands and accept only the ones from COMMANDS table--------------------------------
 
-        	fp = popen(&inbuf[17], "r");
+			token = strtok(tmp4,d2);
+			//printf("token:%s-\n",token );
+        	if (strcmp("end",token) == 0 || strcmp("end\n",token) == 0 ){
+        	 	kill(getppid(),SIGUSR1);
+        	 	goto start;
+
+        	}else if(strcmp("timeToStop",token) == 0 || strcmp("timeToStop\n",token) == 0){
+        	 	kill(getppid(),SIGUSR2);
+        	 	goto start;
+        	}
+
+
+        	strncpy(tmp4,&inbuf[17],100);
+
+        	bzero(finalCmd,sizeof(finalCmd));
+
+			token = strtok(tmp4,d);
+
+			strcpy(tmp4,token);
+			//printf("=%s\n",tmp4 );
+
+			strcpy(tmp3,tmp4);
+			token = strtok(tmp3,d1);
+
+			while(token != NULL){
+				
+				flag = 0;
+				n = 0;
+				bzero(tmp5,PIPE_BUFFER_SIZE);
+
+				for(int i=0; i<100 ; i++){
+					//printf("-+%c\n",token[i] );
+					if(!isspace(token[i]) ){
+						//printf("=-+%c\n",token[i] );
+						flag = 1;
+						tmp5[n] = token[i];
+						n++;
+					}else if(( token[i] == '\0' || isspace(token[i])) && flag){
+						tmp5[n] = '\0';
+						//printf("==%s\n",tmp5 );
+						//check if command is a supported command 
+						for(int j=0 ; j<5;j++){
+							if(strcmp(tmp5,COMMANDS[j]) == 0){
+								if(finalCmd[0] != '\0'){
+									strcat(finalCmd,"|");
+								}
+								strcat(finalCmd,token);
+								goto con;
+							}
+						}
+						//if programm reach here , it means command is not supported
+						//so every following pipe-command is discarded
+						goto execute;
+					}
+
+					
+				}
+				con:
+				//printf("FINAL = %s\n",finalCmd );
+
+				token = strtok(NULL,d1);
+
+			}
+
+			// printf("Token1 %s\n",token );
+
+			execute:
+
+			printf("FINAL cmd to execute = %s\n",finalCmd );
+        	fp = popen(finalCmd, "r");
 		  	if (fp == NULL) {
 		    	printf("Failed to run command\n" );
 		    	exit(1);
@@ -274,9 +381,9 @@ int main(int argc, char *argv[]) {
 		    //TODO Read and send output back to client
 
 		    // send instruction number  and packet number along with 504 bytes of data
-		    while (fgets(path, sizeof(path), fp) != NULL) {
-    			printf("Child %d command %d to port %d: %s", getpid(),instrNumber,clientPort,path);
-  			}
+		   //  while (fgets(path, sizeof(path), fp) != NULL) {
+    	// 		printf("Child %d command %d to port %d: %s", getpid(),instrNumber,clientPort,path);
+  			// }
 
 
   			
@@ -290,7 +397,7 @@ int main(int argc, char *argv[]) {
         	
     	}
     }
-    printf("Out %d parent is %d\n", getpid(),getppid());
+    fprintf(stderr,"Terminated process with pid : %d  \n", getpid());
 
 	return 0;
 }

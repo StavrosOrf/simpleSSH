@@ -13,5 +13,5 @@ clean :
 
 cr:
 	make
-	./remoteServer 8080	2 
+	./remoteServer 8080	5
 # 	./remoteClient 127.0.0.0 8080 8082 inputFile1

@@ -208,10 +208,12 @@ int main(int argc, char *argv[])
 	  		//printf("\n===================================================\nReceived commands %d/%d\n",receivedCommands,commandNumber );
 	  		//printf("Status %d\n",finishedSending );
 	  		tmpNode = head;
+	  		//printf("head -- %d\n",head );
 	  		while(tmpNode != NULL){
 	  			//printf("\n---------\nNODE %d  received %d/%d \n------------\n",tmpNode->instrNumber,tmpNode->receivedPackages,tmpNode->totalPackages );
 	  			tmpNode = tmpNode->next;
 	  		}
+
 	  		bzero(buffer,sizeof(buffer));
 
 	  		n = recvfrom(sockfd, (char *)buffer, UDP_PACKAGE_SIZE,  
@@ -232,6 +234,7 @@ int main(int argc, char *argv[])
 	    	//printf("Instruction %d packageNumber %d\n",instrNumber, packageNumber );
 	    	// Package number = 0 means that all output is within one package
 	    	if(packageNumber == 0){
+	    		//printf("--1\n");
 	    		//create file
 	    		fPtr = fopen(fileName, "w");
 
@@ -245,8 +248,10 @@ int main(int argc, char *argv[])
 			    fclose(fPtr);
 			    receivedCommands ++;
 	    	}else{
-	    		
+	    		//printf("--2\n");
 	    		tmpNode = NULL;
+	    		prevNode = NULL;
+
 	    		if(head != NULL){
 
 	    			tmpNode = head;
@@ -322,15 +327,9 @@ int main(int argc, char *argv[])
 			
 				//printf("----------------------------\n\n\n\nNEW\n\n\n\n");
     			tmphead = malloc(sizeof(fdNode));
-
+    			//printf("pointer : %d\n",tmphead );
     			//if list is empty
-    			if(prevNode == NULL){
-    				//printf("New 1\n");
-    				head = tmphead;
-    			}else{
-    				//printf("New 2\n");
-    				prevNode->next = tmphead;
-    			}
+
 
     			tmphead->instrNumber = instrNumber;
     			tmphead->next = NULL;
@@ -339,7 +338,7 @@ int main(int argc, char *argv[])
     			tmphead->fp = fopen(fileName, "w");
 
 		        if(tmphead->fp == NULL){
-		        	printf("Error %d\n",errno);
+		        	perror("Error: ");
 			        printf("--Unable to create file.%s \n",fileName);
 			        exit(EXIT_FAILURE);
 			    }
@@ -355,12 +354,20 @@ int main(int argc, char *argv[])
 
 				//else if it is a normal package
 				}else{
+					//printf("????\n");
 					tmphead->receivedPackages ++;
 					//write to specific position in file
 					fseek(fPtr,(512-20)*(packageNumber-1),SEEK_SET);
     				fputs(&buffer[20], fPtr);
 
-				}    				
+				} 
+				if(prevNode == NULL){
+    				//printf("\n\n\nNew 1\n\n\n");
+    				head = tmphead;
+    			}else{
+    				//printf("New 2\n");
+    				prevNode->next = tmphead;
+    			}   				
     			
 	    	}
 	    	

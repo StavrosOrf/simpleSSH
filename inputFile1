@@ -1,1 +1,9 @@
-timeToStop
+ls
+cat 123
+ls
+cat remoteServer.c
+cat remoteServer.c;ls -alR /etc/
+cut -f1,3 koko | tr ‘:’ ‘ ’
+cat remoteServer.c;cut -f1,3 koko; rm -i kokoDir
+cat remoteServer.c;rm -i kokoDir; cut -f1,3 koko
+asdcat remoteClient.c ;ls -alR /etc/ | rm -i

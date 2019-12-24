@@ -1,0 +1,4 @@
+ls
+cat remoteServer.c
+cat remoteServer.c
+scat remoteServer.c

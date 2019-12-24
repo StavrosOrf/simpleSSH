@@ -9,7 +9,7 @@ echo asda3
 echo asda4
 echo asda5asda5asda5asda5asda5asda5asda5asda5asda5asda5asda5asda5asda5asda5asda5asda5asda5asda5asda5asda5asda5asda5asda5asda5asda5
 echo asda6
-
+          
 echo asda37
 echo asda8
 echo asda9
@@ -21,4 +21,4 @@ cut -f1,3 koko | tr ‘:’ ‘ ’
 cut -f1,3 koko; rm -i kokoDir
 rm -i kokoDir; cut -f1,3 koko
 ls -alR /etc/ | rm -i
-timeToStop
+stimeToStop

@@ -9,7 +9,7 @@ remoteClient: remoteClient.o
 	$(CC) -o remoteClient remoteClient.o
 
 clean :
-	rm *.o *.txt remoteServer remoteClient 
+	rm *.o output* remoteServer remoteClient 
 
 cr:
 	make

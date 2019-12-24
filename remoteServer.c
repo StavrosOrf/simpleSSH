@@ -13,6 +13,8 @@
 #include <errno.h>
 #include <sys/wait.h>
 #include <ctype.h>
+#include <arpa/inet.h> 
+#include <netinet/in.h> 
 
 #define NUMBER_OF_COMMANDS_TO_SEND 10
 #define BUFFER_SIZE NUMBER_OF_COMMANDS_TO_SEND*101 + 6 + 11 
@@ -20,6 +22,7 @@
 #define MAX 10*100 
 #define MAX_COUNT  200
 #define PIPE_BUFFER_SIZE   118
+#define UDP_PACKAGE_SIZE 512
 char* COMMANDS[5] = {"ls","cut","tr","cat","grep"};
 pid_t ppid;
 int * childrenPID;
@@ -66,7 +69,7 @@ void signal_handlerStop(int sig){
 	exit(0);
 
 }
-// Function designed for chat between client and server. 
+
 void accept_commands(int sockfd,int pipeWrite) 
 { 
     char buffer[BUFFER_SIZE]; 
@@ -266,7 +269,7 @@ int main(int argc, char *argv[]) {
 	    close(sockfd); 
 
     }else{//if child wait parent for commands
-    	
+    	signal(SIGPIPE, SIG_IGN);
     	char tmp1[6],tmp2[11],tmp3[PIPE_BUFFER_SIZE],tmp4[PIPE_BUFFER_SIZE],tmp5[PIPE_BUFFER_SIZE],finalCmd[PIPE_BUFFER_SIZE];
     	char path[1035];
     	int instrNumber,clientPort ;
@@ -275,31 +278,34 @@ int main(int argc, char *argv[]) {
     	char* token3;
     	char **saveptr1, **saveptr2, **saveptr3;
     	const char d[2] = ";",d1[2] = "|",d2[2] = " ";
-    	int n,i,flag;
+    	int n,i,flag,package_number;
+    	int sockfd,counter; 
+    	char buffer[UDP_PACKAGE_SIZE],c; 
+    	struct sockaddr_in servaddr;
 
     	FILE *fp;
     	
     	while(1){
     		start:
     		n = 0;
+    		fp = NULL;
     		bzero(inbuf,sizeof(inbuf));
-    		//printf("Process %d ,Gonna block\n",getpid());
+    		printf("Process %d ,Gonna block\n",getpid());
     		while ((nbytes = read(p[0], inbuf, PIPE_BUFFER_SIZE)) > 0) {
     			printf("Child %d read %d bytes and says %s\n",getpid(),nbytes, &inbuf[17]);
             	break; 
     		}
 
     		strncpy(tmp4,&inbuf[17],100);
-    		//printf("test1\n");
     		strncpy(tmp2,&inbuf[7],10);
-    		//printf("test2\n");
 			instrNumber = atoi(tmp2);
-    		//printf("test3\n");
 			strncpy(tmp1,inbuf,6);
-			//printf("test4\n");
 			clientPort = atoi(tmp1);
-			//printf("tokensInbuf:%s-\n",&inbuf[17] );
-			//printf("tokens:%s-\n",tmp4 );
+
+			//IF empty command
+			if(inbuf[17] == '\0'){
+				goto send;
+			}
 
         	//Edit commands and accept only the ones from COMMANDS table--------------------------------
 
@@ -371,29 +377,129 @@ int main(int argc, char *argv[]) {
 
 			execute:
 
-			printf("FINAL cmd to execute = %s\n",finalCmd );
+			printf("FINAL cmd to execute #%d= %s\n",instrNumber, finalCmd );
+
+			if(finalCmd[0] == '\0'){
+				goto send;
+			}
+
         	fp = popen(finalCmd, "r");
 		  	if (fp == NULL) {
 		    	printf("Failed to run command\n" );
 		    	exit(1);
 		    }
+
+
+		    send:
+  			
+  			if ( (sockfd = socket(AF_INET, SOCK_DGRAM, 0)) < 0 ) { 
+		        perror("socket creation failed"); 
+		        exit(EXIT_FAILURE); 
+		    }
+
+			memset(&servaddr, 0, sizeof(servaddr)); 
+      	
+		    // Filling server information 
+		    servaddr.sin_family = AF_INET; 
+		    servaddr.sin_port = htons(clientPort); 
+		    servaddr.sin_addr.s_addr = INADDR_ANY;  
+		 	
 		    
-		    //TODO Read and send output back to client
+
+		    bzero(buffer,sizeof(buffer));
+		    package_number = 0;
+
+		    sprintf(tmp2,"%10u",instrNumber);
+		    strncpy(buffer,tmp2,10);
+		    sprintf(tmp2,"%10u",package_number);
+		    strncpy(&buffer[10],tmp2,10);
+
 
 		    // send instruction number  and packet number along with 504 bytes of data
 		   //  while (fgets(path, sizeof(path), fp) != NULL) {
     	// 		printf("Child %d command %d to port %d: %s", getpid(),instrNumber,clientPort,path);
   			// }
+  			if(fp != NULL){
+			    counter = 20;
+			    for (c = getc(fp); c != EOF; c = getc(fp)){
+
+			    	buffer[counter] = c;
+			    	counter ++;
+
+			    	//if more than one neccesary packages needed
+			    	if(counter == UDP_PACKAGE_SIZE){
+			    		counter = 20;
+			    		package_number ++;
+
+			    		sprintf(tmp2,"%10u",instrNumber);
+			   			strncpy(buffer,tmp2,10);
+
+			    		sprintf(tmp2,"%10u",package_number);
+			    		strncpy(&buffer[10],tmp2,10);
+
+			    		sendto(sockfd, (const char *)buffer, strlen(buffer), 
+			       			MSG_CONFIRM, (const struct sockaddr *) &servaddr,  
+			            	sizeof(servaddr)); 
+			    		//sleep(0.1);
+			    		//printf("message sent %s\n",buffer);
+
+			    		bzero(buffer,sizeof(buffer));
+			    	}
+			    }   				
+  			}else{
+  				c = EOF;
+  			}
+
+        		
+ 			if(c == EOF){
+ 				if(package_number == 0){
+ 					sendto(sockfd, (const char *)buffer, strlen(buffer), 
+		        		MSG_CONFIRM, (const struct sockaddr *) &servaddr,  
+		            	sizeof(servaddr)); 
+		    		//printf("message sent %s\n",buffer);
+ 				}else{
+ 					package_number ++;
+		    		sprintf(tmp2,"%10u",instrNumber);
+		   			strncpy(buffer,tmp2,10);
+
+		    		sprintf(tmp2,"%10u",package_number);
+		    		strncpy(&buffer[10],tmp2,10);
+
+		    		sendto(sockfd, (const char *)buffer, strlen(buffer), 
+		       			MSG_CONFIRM, (const struct sockaddr *) &servaddr,  
+		            	sizeof(servaddr)); 
+		    		
+		    		//printf("message sent %s\n",buffer);
+
+		    		//send the final recognition package
+		    		bzero(buffer,sizeof(buffer));
+
+		    		sprintf(tmp2,"%10u",instrNumber);
+		   			strncpy(buffer,tmp2,10);
 
 
-  			
-  			
+		    		sprintf(tmp2,"%10u",package_number);
+		    		strncpy(&buffer[20],tmp2,10);
 
-  			//TODO kallinteris enstablish udp connection on variables
-  			// and send 512 bytes of whatever 
+		    		package_number = 999999999;
+		    		sprintf(tmp2,"%10u",package_number);
+		    		strncpy(&buffer[10],tmp2,10);
 
+		    		sendto(sockfd, (const char *)buffer, strlen(buffer), 
+		       			MSG_CONFIRM, (const struct sockaddr *) &servaddr,  
+		            	sizeof(servaddr)); 
+		    		
+		    		//printf("message sent %s\n",buffer);		    		
 
-		    pclose(fp);
+ 				}
+
+ 			}
+  
+		    close(sockfd);
+		    if(fp != NULL){
+		    	pclose(fp);
+		    }
+		    
         	
     	}
     }

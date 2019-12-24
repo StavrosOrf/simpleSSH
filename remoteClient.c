@@ -9,10 +9,31 @@
 #include <stdlib.h>
 #include <signal.h>
 #include <arpa/inet.h>
+#include <errno.h>
+
 
 #define NUMBER_OF_COMMANDS_TO_SEND 10
 #define BUFFER_SIZE NUMBER_OF_COMMANDS_TO_SEND*101 + 6 + 11 
 #define SA struct sockaddr 
+#define UDP_PACKAGE_SIZE 512
+int finishedSending = 0; 
+
+typedef struct node {
+    FILE* fp;
+    int instrNumber;
+    int receivedPackages;
+    int totalPackages;
+    struct node * next;
+} fdNode;
+
+
+
+void signal_handler(int sig)
+{
+	//fprintf(stderr,"Finished sending Commands process with pid : %d  \n", getpid());
+	finishedSending = 1;
+}
+
 
 void sendCommands(int sockfd ,int receivePORT,char* fileName) 
 { 
@@ -49,7 +70,7 @@ void sendCommands(int sockfd ,int receivePORT,char* fileName)
          	if(line[99] != '\0'){
          		//printf("%s\n",line );
          		bzero(line,sizeof(line));
-         		printf("Too many characters\n");
+         		//printf("Too many characters\n");
 
          		//flush the remaining line and move the pointer to the new line
          		while(1){
@@ -60,6 +81,7 @@ void sendCommands(int sockfd ,int receivePORT,char* fileName)
  					bzero(line,sizeof(line));
          		}
          		bzero(line,sizeof(line));
+         		line[0] = '\0';
          	}
          	
          	
@@ -79,7 +101,7 @@ void sendCommands(int sockfd ,int receivePORT,char* fileName)
     		if(i==17 || (i-17)%101 == 0){
     			printf("\n");
     		}
-    		printf("%c ",buffer[i]);
+    		printf("%c",buffer[i]);
     	}
     	printf("\n");
 
@@ -87,24 +109,52 @@ void sendCommands(int sockfd ,int receivePORT,char* fileName)
     	//Send to Server through TCP socket
         write(sockfd, buffer, sizeof(buffer)); 
         
-
-        if ((strncmp(buffer, "exit", 4)) == 0) { 
-            printf("Client Exit...\n"); 
-            break; 
-        }
         if(!terminatingFlag)
         	sleep(5);
     } 
 
     fclose(file);
+    kill(getppid(),SIGUSR1);
 } 
+ 
+int countLines(char* filename){
+
+	int count = 0;  
+    char c; 
   
+    FILE *fp; 
+    fp = fopen(filename, "r"); 
+  
+    // Check if file exists 
+    if (fp == NULL) 
+    { 
+        printf("Could not open file %s", filename); 
+        return 0; 
+    } 
+  
+
+    for (c = getc(fp); c != EOF; c = getc(fp)) 
+        if (c == '\n') // Increment count if this character is newline 
+            count = count + 1; 
+  
+    fclose(fp); 
+    printf("The file %s has %d lines\n ", filename, count); 
+    return count;
+}  
+
 int main(int argc, char *argv[]) 
 { 
 	char* serverName = argv[1];
 	unsigned int serverPORT = (uintptr_t)atoi(argv[2]);
 	unsigned int receivePORT = (uintptr_t)atoi(argv[3]);
 	char* inputFileWithCommands = argv[4];
+	FILE * fPtr;
+	fdNode* head = NULL;
+	fdNode* tmphead;
+	fdNode* tmpNode;
+	fdNode* prevNode;
+
+	signal(SIGUSR1,signal_handler);
 
 	if(receivePORT > 65535 || serverPORT > 65535){
 		printf("Invalid Port\n");
@@ -114,21 +164,220 @@ int main(int argc, char *argv[])
 	pid_t ppid = getpid();
 	printf("Parent pid %d \n", getpid() );
 
-
 	pid_t childPid = fork();
+	int commandNumber = countLines(inputFileWithCommands);
 
 	if(getpid() == ppid){
-		printf("Child pid %d \n", childPid );
-		//TODO KALLINTERIS create udp connection and receive data (512 bytes)
-		//and write each instruction to a tmp file, consider that every instruction returns at max 512 bytes
 
-		// dont exit ,just wait for data
-		while(1){
+
+		int sockfd; 
+	    char buffer[UDP_PACKAGE_SIZE]; 
+	    struct sockaddr_in servaddr, cliaddr; 
+	      
+	    // Creating socket file descriptor 
+	    if ( (sockfd = socket(AF_INET, SOCK_DGRAM, 0)) < 0 ) { 
+	        perror("socket creation failed"); 
+	        exit(EXIT_FAILURE); 
+	    } 
+	      
+	    memset(&servaddr, 0, sizeof(servaddr)); 
+	    memset(&cliaddr, 0, sizeof(cliaddr)); 
+	      
+	    // Filling server information 
+	    servaddr.sin_family    = AF_INET; // IPv4 
+	    servaddr.sin_addr.s_addr = INADDR_ANY; 
+	    servaddr.sin_port = htons(receivePORT); 
+	      
+	    // Bind the socket with the server address 
+	    if ( bind(sockfd, (const struct sockaddr *)&servaddr,  
+	            sizeof(servaddr)) < 0 ) 
+	    { 
+	        perror("bind failed"); 
+	        exit(EXIT_FAILURE); 
+	    } 
+	      
+	    int len, n, receivedCommands = 0;;
+	    char strInstr[11],strPackage[11],strTmp[11],fileName[100];
+	    int instrNumber,packageNumber,tmp; 
+	  
+	    len = sizeof(cliaddr);  
+	  	//head != NULL ||
+	  	start:
+	  	while( receivedCommands < commandNumber || finishedSending == 0){
+	  		
+	  		//printf("\n===================================================\nReceived commands %d/%d\n",receivedCommands,commandNumber );
+	  		//printf("Status %d\n",finishedSending );
+	  		tmpNode = head;
+	  		while(tmpNode != NULL){
+	  			//printf("\n---------\nNODE %d  received %d/%d \n------------\n",tmpNode->instrNumber,tmpNode->receivedPackages,tmpNode->totalPackages );
+	  			tmpNode = tmpNode->next;
+	  		}
+	  		bzero(buffer,sizeof(buffer));
+
+	  		n = recvfrom(sockfd, (char *)buffer, UDP_PACKAGE_SIZE,  
+	                MSG_WAITALL, ( struct sockaddr *) &cliaddr, 
+	                &len);
+
+	    	buffer[n] = '\0';
+	    	//printf("Client : %s\n", buffer);
+
+	    	strncpy(strInstr,buffer,10);
+	    	instrNumber = atoi(strInstr);
+	    	instrNumber++;
+
+	    	strncpy(strPackage ,&buffer[10],10);
+	    	packageNumber = atoi(strPackage);
+	    	//generate fileName
+	    	sprintf(fileName,"output.%d,%d",receivePORT,instrNumber);
+	    	//printf("Instruction %d packageNumber %d\n",instrNumber, packageNumber );
+	    	// Package number = 0 means that all output is within one package
+	    	if(packageNumber == 0){
+	    		//create file
+	    		fPtr = fopen(fileName, "w");
+
+
+		        if(fPtr == NULL){
+			        printf("Unable to create file.%s \n",fileName);
+			        exit(EXIT_FAILURE);
+			    }
+			    //fseek(fPtr,512*instrNumber,SEEK_SET);
+			    fputs(&buffer[20], fPtr);
+			    fclose(fPtr);
+			    receivedCommands ++;
+	    	}else{
+	    		
+	    		tmpNode = NULL;
+	    		if(head != NULL){
+
+	    			tmpNode = head;
+	    			prevNode = NULL;
+	    			while(tmpNode != NULL){
+	    				//found node
+	    				if(tmpNode->instrNumber == instrNumber){
+	    					
+	    					//set file pointer
+	    					fPtr = tmpNode->fp;
+
+	    					//final package, set total packages to wait
+	    					if(packageNumber == 999999999){
+	    						//printf("Setting--------\n");
+	    						strncpy(strTmp,&buffer[20],10);
+	    						tmp = atoi(strTmp);
+
+	    						tmpNode->totalPackages = tmp;
+	    						//if all packages arrived, close file
+	    						if(tmpNode->receivedPackages == tmp){
+	    							//printf("Arrived--------\n");
+	    							receivedCommands ++;
+	    							fclose(fPtr);
+
+	    							//and delete node from list
+	    							if(prevNode != NULL){
+	    								//printf("Arrived--------1\n");
+	    								prevNode->next = tmpNode->next;
+	    								free(tmpNode);
+	    								goto start;
+	    							}else{
+	    								//printf("Arrived--------2\n");
+	    								head = tmpNode->next;
+	    								free(tmpNode);
+	    								goto start;
+	    							}
+	    						}
+	    					//else if it is a normal package
+	    					}else{
+	    						tmpNode->receivedPackages ++;
+	    						//printf("\n\nWriting package %d %d/%d\n\n",packageNumber,tmpNode->receivedPackages,tmpNode->totalPackages);
+	    						//write to specific position in file
+	    						fseek(fPtr,(512-20)*(packageNumber-1),SEEK_SET);
+			    				fputs(&buffer[20], fPtr);
+
+			    				//if all packages arrived, close file
+	    						if(tmpNode->receivedPackages == tmpNode->totalPackages){
+	    							//printf("\n\nClosing command %d\n\n",instrNumber );
+	    							receivedCommands ++;
+	    							fclose(fPtr);
+
+	    							//and delete node from list
+	    							if(prevNode != NULL){
+	    								prevNode->next = tmpNode->next;
+	    								free(tmpNode);
+	    								goto start;
+	    							}else{
+	    								head = tmpNode->next;
+	    								free(tmpNode);
+	    								goto start;
+	    							}
+	    						}
+	    					}
+	    					goto start;
+	    				}
+	    				prevNode = tmpNode;
+	    				tmpNode = tmpNode->next;
+	    			}
+	    		} 
+
+
+	    		//Node doesnt exist, first package of instruction arrived
+			
+				//printf("----------------------------\n\n\n\nNEW\n\n\n\n");
+    			tmphead = malloc(sizeof(fdNode));
+
+    			//if list is empty
+    			if(prevNode == NULL){
+    				//printf("New 1\n");
+    				head = tmphead;
+    			}else{
+    				//printf("New 2\n");
+    				prevNode->next = tmphead;
+    			}
+
+    			tmphead->instrNumber = instrNumber;
+    			tmphead->next = NULL;
+    			tmphead->receivedPackages = 0;
+    			tmphead->totalPackages = -1;
+    			tmphead->fp = fopen(fileName, "w");
+
+		        if(tmphead->fp == NULL){
+		        	printf("Error %d\n",errno);
+			        printf("--Unable to create file.%s \n",fileName);
+			        exit(EXIT_FAILURE);
+			    }
+
+			    fPtr = tmphead->fp;
+			    //check package type
+				if(packageNumber == 999999999){
+					//printf("Setting--------NEW\n");
+					strncpy(strTmp,&buffer[20],10);
+					tmp = atoi(strInstr);
+
+					tmphead->totalPackages = tmp;
+
+				//else if it is a normal package
+				}else{
+					tmphead->receivedPackages ++;
+					//write to specific position in file
+					fseek(fPtr,(512-20)*(packageNumber-1),SEEK_SET);
+    				fputs(&buffer[20], fPtr);
+
+				}    				
+    			
+	    	}
+	    	
+	    	
 
 		}
+
+		close(sockfd);
+
+	     
+
+	    
+
+
  
 	}else{
-		printf("PID = %d and pid = %d\n",getpid(), ppid);
+		//printf("PID = %d and pid = %d\n",getpid(), ppid);
 
 		if(argc == 1 || argc >5){
 			printf("Wrong number of arguments\n");
@@ -170,7 +419,7 @@ int main(int argc, char *argv[])
 	    close(sockfd); 
 	}
 
-	printf("Out %d parent is %d\n", getpid(),getppid());
+	printf("(CLIENT)Terminating process %d \n", getpid());
 	
 } 
 
@@ -185,7 +434,6 @@ Questions
 	so the parent can wait for the results 
 	while the kid sends the commands to the server and then terminate ?
 
--Mutex allowed for pipe synchronization ?( though i dont think it is necessary to use them)
 
 - UDP by default assures us that any package could be lost. Do we have to think that a package could not be succesfully sent to the server?
 

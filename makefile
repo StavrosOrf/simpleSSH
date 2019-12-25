@@ -1,12 +1,13 @@
 CC=gcc
+CFLAGS=-g
 
 all: remoteServer remoteClient
 
 remoteServer: remoteServer.o 
-	$(CC) -o remoteServer remoteServer.o
+	$(CC) $(CFLAGS) -o remoteServer remoteServer.o
 
 remoteClient: remoteClient.o 
-	$(CC) -o remoteClient remoteClient.o
+	$(CC) $(CFLAGS) -o remoteClient remoteClient.o
 
 clean :
 	rm *.o output* remoteServer remoteClient 

@@ -175,6 +175,10 @@ void accept_commands(int sockfd,int pipeWrite)
 } 
 
 int main(int argc, char *argv[]) {
+	if(argc != 3){
+		printf("Wrong number of arguments\n");
+		exit(1);
+	}
 
 	numberOfChilds = (uintptr_t)atoi(argv[2]);
 	unsigned int serverPort = (uintptr_t)atoi(argv[1]);

@@ -1,11 +1,11 @@
-#include <netdb.h> 
-#include <stdio.h> 
-#include <stdlib.h> 
-#include <string.h> 
-#include <sys/socket.h> 
-#include <unistd.h> 
+#include <netdb.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <sys/socket.h>
+#include <unistd.h>
 #include <inttypes.h>
-#include <netinet/in.h> 
+#include <netinet/in.h>
 #include <stdlib.h>
 #include <signal.h>
 #include <arpa/inet.h>
@@ -13,10 +13,10 @@
 
 
 #define NUMBER_OF_COMMANDS_TO_SEND 10
-#define BUFFER_SIZE NUMBER_OF_COMMANDS_TO_SEND*101 + 6 + 11 
-#define SA struct sockaddr 
+#define BUFFER_SIZE NUMBER_OF_COMMANDS_TO_SEND*101 + 6 + 11
+#define SA struct sockaddr
 #define UDP_PACKAGE_SIZE 512
-int finishedSending = 0; 
+int finishedSending = 0;
 
 typedef struct node {
     FILE* fp;
@@ -35,8 +35,8 @@ void signal_handler(int sig)
 }
 
 
-void sendCommands(int sockfd ,int receivePORT,char* fileName) 
-{ 
+void sendCommands(int sockfd ,int receivePORT,char* fileName)
+{
     char buffer[BUFFER_SIZE];
     char line[101];
     char strPort[6];
@@ -49,15 +49,15 @@ void sendCommands(int sockfd ,int receivePORT,char* fileName)
     sprintf(strPort,"%5u",receivePORT);
 
     int n;
-    int numberOfInstructions ; 
-    
+    int numberOfInstructions ;
 
-    while(!terminatingFlag) { 
+
+    while(!terminatingFlag) {
     	numberOfInstructions = 0;
-    	bzero(buffer, sizeof(buffer)); 
+    	bzero(buffer, sizeof(buffer));
     	n = 0;
 
-    	strcpy(buffer,strPort);   	
+    	strcpy(buffer,strPort);
 
          while (n <10){
          	bzero(line,sizeof(line));
@@ -77,14 +77,14 @@ void sendCommands(int sockfd ,int receivePORT,char* fileName)
          			fgets(line, sizeof(line), file);
         			if(line[99] == '\0'){
         				break;
- 	        		}     			
+ 	        		}
  					bzero(line,sizeof(line));
          		}
          		bzero(line,sizeof(line));
          		line[0] = '\0';
          	}
-         	
-         	
+
+
 
          	//copy command to buffer
            	strcpy(&buffer[101*n + 17],line);
@@ -107,43 +107,43 @@ void sendCommands(int sockfd ,int receivePORT,char* fileName)
 
 
     	//Send to Server through TCP socket
-        write(sockfd, buffer, sizeof(buffer)); 
-        
+        write(sockfd, buffer, sizeof(buffer));
+
         if(!terminatingFlag)
         	sleep(5);
-    } 
+    }
 
     fclose(file);
     kill(getppid(),SIGUSR1);
-} 
- 
+}
+
 int countLines(char* filename){
 
-	int count = 0;  
-    char c; 
-  
-    FILE *fp; 
-    fp = fopen(filename, "r"); 
-  
-    // Check if file exists 
-    if (fp == NULL) 
-    { 
-        printf("Could not open file %s", filename); 
-        return 0; 
-    } 
-  
+	int count = 0;
+    char c;
 
-    for (c = getc(fp); c != EOF; c = getc(fp)) 
-        if (c == '\n') // Increment count if this character is newline 
-            count = count + 1; 
-  
-    fclose(fp); 
-    printf("The file %s has %d lines\n ", filename, count); 
+    FILE *fp;
+    fp = fopen(filename, "r");
+
+    // Check if file exists
+    if (fp == NULL)
+    {
+        printf("Could not open file %s", filename);
+        return 0;
+    }
+
+
+    for (c = getc(fp); c != EOF; c = getc(fp))
+        if (c == '\n') // Increment count if this character is newline
+            count = count + 1;
+
+    fclose(fp);
+    printf("The file %s has %d lines\n ", filename, count);
     return count;
-}  
+}
 
-int main(int argc, char *argv[]) 
-{ 
+int main(int argc, char *argv[])
+{
 	char* serverName = argv[1];
 	unsigned int serverPORT = (uintptr_t)atoi(argv[2]);
 	unsigned int receivePORT = (uintptr_t)atoi(argv[3]);
@@ -156,55 +156,57 @@ int main(int argc, char *argv[])
 
 	signal(SIGUSR1,signal_handler);
 
+	if(argc != 5){
+		printf("Wrong number of arguments\n");
+		exit(1);
+	}
+
 	if(receivePORT > 65535 || serverPORT > 65535){
 		printf("Invalid Port\n");
 		exit(1);
 	}
 
 	pid_t ppid = getpid();
-	printf("Parent pid %d \n", getpid() );
 
 	pid_t childPid = fork();
 	int commandNumber = countLines(inputFileWithCommands);
 
 	if(getpid() == ppid){
+		int sockfd;
+	    char buffer[UDP_PACKAGE_SIZE];
+	    struct sockaddr_in servaddr, cliaddr;
 
+	    // Creating socket file descriptor
+	    if ( (sockfd = socket(AF_INET, SOCK_DGRAM, 0)) < 0 ) {
+	        perror("socket creation failed");
+	        exit(EXIT_FAILURE);
+	    }
 
-		int sockfd; 
-	    char buffer[UDP_PACKAGE_SIZE]; 
-	    struct sockaddr_in servaddr, cliaddr; 
-	      
-	    // Creating socket file descriptor 
-	    if ( (sockfd = socket(AF_INET, SOCK_DGRAM, 0)) < 0 ) { 
-	        perror("socket creation failed"); 
-	        exit(EXIT_FAILURE); 
-	    } 
-	      
-	    memset(&servaddr, 0, sizeof(servaddr)); 
-	    memset(&cliaddr, 0, sizeof(cliaddr)); 
-	      
-	    // Filling server information 
-	    servaddr.sin_family    = AF_INET; // IPv4 
-	    servaddr.sin_addr.s_addr = INADDR_ANY; 
-	    servaddr.sin_port = htons(receivePORT); 
-	      
-	    // Bind the socket with the server address 
-	    if ( bind(sockfd, (const struct sockaddr *)&servaddr,  
-	            sizeof(servaddr)) < 0 ) 
-	    { 
-	        perror("bind failed"); 
-	        exit(EXIT_FAILURE); 
-	    } 
-	      
+	    memset(&servaddr, 0, sizeof(servaddr));
+	    memset(&cliaddr, 0, sizeof(cliaddr));
+
+	    // Filling server information
+	    servaddr.sin_family    = AF_INET; // IPv4
+	    servaddr.sin_addr.s_addr = INADDR_ANY;
+	    servaddr.sin_port = htons(receivePORT);
+
+	    // Bind the socket with the server address
+	    if ( bind(sockfd, (const struct sockaddr *)&servaddr,
+	            sizeof(servaddr)) < 0 )
+	    {
+	        perror("bind failed");
+	        exit(EXIT_FAILURE);
+	    }
+
 	    int len, n, receivedCommands = 0;;
 	    char strInstr[11],strPackage[11],strTmp[11],fileName[100];
-	    int instrNumber,packageNumber,tmp; 
-	  
-	    len = sizeof(cliaddr);  
+	    int instrNumber,packageNumber,tmp;
+
+	    len = sizeof(cliaddr);
 	  	//head != NULL ||
 	  	start:
 	  	while( receivedCommands < commandNumber || finishedSending == 0){
-	  		
+
 	  		//printf("\n===================================================\nReceived commands %d/%d\n",receivedCommands,commandNumber );
 	  		//printf("Status %d\n",finishedSending );
 	  		tmpNode = head;
@@ -216,8 +218,8 @@ int main(int argc, char *argv[])
 
 	  		bzero(buffer,sizeof(buffer));
 
-	  		n = recvfrom(sockfd, (char *)buffer, UDP_PACKAGE_SIZE,  
-	                MSG_WAITALL, ( struct sockaddr *) &cliaddr, 
+	  		n = recvfrom(sockfd, (char *)buffer, UDP_PACKAGE_SIZE,
+	                MSG_WAITALL, ( struct sockaddr *) &cliaddr,
 	                &len);
 
 	    	buffer[n] = '\0';
@@ -259,7 +261,7 @@ int main(int argc, char *argv[])
 	    			while(tmpNode != NULL){
 	    				//found node
 	    				if(tmpNode->instrNumber == instrNumber){
-	    					
+
 	    					//set file pointer
 	    					fPtr = tmpNode->fp;
 
@@ -320,11 +322,11 @@ int main(int argc, char *argv[])
 	    				prevNode = tmpNode;
 	    				tmpNode = tmpNode->next;
 	    			}
-	    		} 
+	    		}
 
 
 	    		//Node doesnt exist, first package of instruction arrived
-			
+
 				//printf("----------------------------\n\n\n\nNEW\n\n\n\n");
     			tmphead = malloc(sizeof(fdNode));
     			//printf("pointer : %d\n",tmphead );
@@ -360,75 +362,65 @@ int main(int argc, char *argv[])
 					fseek(fPtr,(512-20)*(packageNumber-1),SEEK_SET);
     				fputs(&buffer[20], fPtr);
 
-				} 
+				}
 				if(prevNode == NULL){
     				//printf("\n\n\nNew 1\n\n\n");
     				head = tmphead;
     			}else{
     				//printf("New 2\n");
     				prevNode->next = tmphead;
-    			}   				
-    			
+    			}
+
 	    	}
-	    	
-	    	
+
 
 		}
 
 		close(sockfd);
 
-	     
-
-	    
 
 
- 
-	}else{
-		//printf("PID = %d and pid = %d\n",getpid(), ppid);
 
-		if(argc == 1 || argc >5){
-			printf("Wrong number of arguments\n");
-			exit(1);
-		}
+	}else{//child
 		printf("%s %s\n",serverName,inputFileWithCommands );
 
-	    int sockfd, connfd; 
-	    struct sockaddr_in servaddr, cli; 
-	  
-	    // socket create and varification 
-	    sockfd = socket(AF_INET, SOCK_STREAM, 0); 
-	    if (sockfd == -1) { 
-	        printf("socket creation failed...\n"); 
-	        exit(0); 
-	    } 
-	    else
-	        printf("Socket successfully created..\n"); 
+	    int sockfd, connfd;
+	    struct sockaddr_in servaddr, cli;
 
-	    bzero(&servaddr, sizeof(servaddr)); 
-	  
-	    // assign IP, PORT 
-	    servaddr.sin_family = AF_INET; 
-	    servaddr.sin_addr.s_addr = inet_addr(serverName); 
-	    servaddr.sin_port = htons(serverPORT); 
-	  
-	    // connect the client socket to server socket 
-	    if (connect(sockfd, (SA*)&servaddr, sizeof(servaddr)) != 0) { 
-	        printf("connection with the server failed...\nPossibly -Wrong serverName or serverPORT\n or \t -Server socket Queue Full\n"); 
-	        exit(0); 
-	    } 
+	    // socket create and varification
+	    sockfd = socket(AF_INET, SOCK_STREAM, 0);
+	    if (sockfd == -1) {
+	        printf("socket creation failed...\n");
+	        exit(0);
+	    }
 	    else
-	        printf("connected to the server..\n"); 
-	  
-	    // function for chat 
-	    sendCommands(sockfd,receivePORT,inputFileWithCommands); 
-	  
-	    // close the socket 
-	    close(sockfd); 
+	        printf("Socket successfully created..\n");
+
+	    bzero(&servaddr, sizeof(servaddr));
+
+	    // assign IP, PORT
+	    servaddr.sin_family = AF_INET;
+	    servaddr.sin_addr.s_addr = inet_addr(serverName);
+	    servaddr.sin_port = htons(serverPORT);
+
+	    // connect the client socket to server socket
+	    if (connect(sockfd, (SA*)&servaddr, sizeof(servaddr)) != 0) {
+	        printf("connection with the server failed...\nPossibly -Wrong serverName or serverPORT\n or \t -Server socket Queue Full\n");
+	        exit(0);
+	    }
+	    else
+	        printf("connected to the server..\n");
+
+	    // function for chat
+	    sendCommands(sockfd,receivePORT,inputFileWithCommands);
+
+	    // close the socket
+	    close(sockfd);
 	}
 
 	printf("(CLIENT)Terminating process %d \n", getpid());
-	
-} 
+
+}
 
 
 
@@ -438,7 +430,7 @@ Questions
 -what is server name ?
 
 -Are we allowed to spawn one child of the client
-	so the parent can wait for the results 
+	so the parent can wait for the results
 	while the kid sends the commands to the server and then terminate ?
 
 

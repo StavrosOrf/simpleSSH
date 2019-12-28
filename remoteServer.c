@@ -1,25 +1,25 @@
 #include <stdio.h>
 #include <string.h>
-#include <sys/types.h> 
-#include <unistd.h> 
+#include <sys/types.h>
+#include <unistd.h>
 #include <inttypes.h>
-#include <netinet/in.h> 
+#include <netinet/in.h>
 #include <stdlib.h>
-#include <sys/socket.h> 
-#include <sys/types.h> 
+#include <sys/socket.h>
+#include <sys/types.h>
 #include <signal.h>
 #include <limits.h>
 #include <netdb.h>
 #include <errno.h>
 #include <sys/wait.h>
 #include <ctype.h>
-#include <arpa/inet.h> 
-#include <netinet/in.h> 
+#include <arpa/inet.h>
+#include <netinet/in.h>
 
 #define NUMBER_OF_COMMANDS_TO_SEND 10
-#define BUFFER_SIZE NUMBER_OF_COMMANDS_TO_SEND*101 + 6 + 11 
+#define BUFFER_SIZE NUMBER_OF_COMMANDS_TO_SEND*101 + 6 + 11
 #define SOCKET struct sockaddr
-#define MAX 10*100 
+#define MAX 10*100
 #define MAX_COUNT  200
 #define PIPE_BUFFER_SIZE   118
 #define UDP_PACKAGE_SIZE 512
@@ -29,54 +29,42 @@ int * childrenPID;
 unsigned int numberOfChilds;
 
 void signal_handlerEnd(int sig){
-		
-	for(int i = 0; i<FD_SETSIZE;i++){
-		if(i != 2){
-			close(i);			
-		}
+	for(int i = 0; i<FD_SETSIZE;i++)
+		close(i);
 
-
-	}
 	fprintf(stderr,"Terminated process with pid : %d  \n", getpid());
-	close(2);
 	exit(0);
 }
 
 void signal_handlerStop(int sig){
-	//printf("Pid : %d Signal Stop\n",getpid() );
 	int status = 0;
 
 	//if parent, wait for all children to exit
 	if(ppid == getpid()){
-        for(int i = 0 ; i < numberOfChilds; i++){
-    		kill(childrenPID[i],SIGUSR2);
-    	}
+		for(int i = 0 ; i < numberOfChilds; i++){
+			kill(childrenPID[i],SIGUSR2);
+		}
 
-		while(wait(&status) > 0); 
-	}
-	
-	
-
-	for(int i = 0; i<FD_SETSIZE;i++){
-		if(i != 2){
-			close(i);			
+		while(wait(&status) > 0); //sync
 	}
 
 
-	}
+
+	for(int i = 0; i<FD_SETSIZE;i++)
+		close(i);
+
 	fprintf(stderr,"Terminated process with pid : %d  \n", getpid());
-	close(2);
 	exit(0);
 
 }
 
-void accept_commands(int sockfd,int pipeWrite) 
-{ 
-    char buffer[BUFFER_SIZE]; 
+void accept_commands(int sockfd,int pipeWrite)
+{
+    char buffer[BUFFER_SIZE];
     char pipeBuffer[PIPE_BUFFER_SIZE];
     int n,i,j,k,l,instrNumber;
 
-    int instructionsSent[FD_SETSIZE]; 
+    int instructionsSent[FD_SETSIZE];
 
     fd_set active_fd_set,read_fd_set;
     struct sockaddr_in clientname;
@@ -85,9 +73,9 @@ void accept_commands(int sockfd,int pipeWrite)
 
  	FD_ZERO(&active_fd_set);
     FD_SET (sockfd,&active_fd_set);
- 
-    while (1) { 
-        bzero(buffer, sizeof(buffer)); 
+
+    while (1) {
+        bzero(buffer, sizeof(buffer));
         //printf("Sockets size %d socket: %d\n",FD_SETSIZE , sockfd);
 
         printf("=====================\n");
@@ -112,25 +100,25 @@ void accept_commands(int sockfd,int pipeWrite)
         				exit(EXIT_FAILURE);
         			}
         			FD_SET(new,&active_fd_set);
-        		
+
         		}else{
         			//socket is already connected
 
-        			bzero(pipeBuffer, sizeof(pipeBuffer)); 
-        			bzero(buffer, sizeof(buffer)); 
+        			bzero(pipeBuffer, sizeof(pipeBuffer));
+        			bzero(buffer, sizeof(buffer));
 
 			        // read the message from client and copy it in buffer
-			        read(i, buffer, sizeof(buffer)); 
+			        read(i, buffer, sizeof(buffer));
 
-			        //if socket was disconnected 
+			        //if socket was disconnected
 			        if(buffer[0] == '\0'){
-			        	printf("--Socket %d closed...\n", i); 
+			        	printf("--Socket %d closed...\n", i);
 			            close(i);
         				FD_CLR(i,&active_fd_set);
         				instructionsSent[i] = 0;
 			        }
 
-			        
+
 			        for(j = 0; j < 6 ;j++){
 			        	pipeBuffer[j] = buffer[j];
 			        }
@@ -161,18 +149,18 @@ void accept_commands(int sockfd,int pipeWrite)
 			        	counter++;
 			        }
 
-			        n = 0; 
+			        n = 0;
 
 			        instructionsSent[i] += instrNumber;
-        			
+
 
         		}
 
         	}
         }
 
-    } 
-} 
+    }
+}
 
 int main(int argc, char *argv[]) {
 	if(argc != 3){
@@ -187,7 +175,7 @@ int main(int argc, char *argv[]) {
 	ppid = getpid();
 	int p[2],nbytes;
 
-	char inbuf[PIPE_BUFFER_SIZE]; 
+	char inbuf[PIPE_BUFFER_SIZE];
 
 	// link signal handlers
 	signal(SIGUSR2,signal_handlerStop);
@@ -232,45 +220,45 @@ int main(int argc, char *argv[]) {
     //if parent wait for clients' commands
     if(getpid() == ppid){
 
-    	
-    	int sockfd, connfd, len; 
-    	struct sockaddr_in servaddr, client; 
 
-    	// socket create and verification 
+    	int sockfd, connfd, len;
+    	struct sockaddr_in servaddr, client;
+
+    	// socket create and verification
     	sockfd = socket(AF_INET, SOCK_STREAM, 0);
-    	if (sockfd == -1) { 
-        	printf("socket creation failed...\n"); 
+    	if (sockfd == -1) {
+        	printf("socket creation failed...\n");
         	exit(1);
-        } 
+        }
 
-	    bzero(&servaddr, sizeof(servaddr)); 
-	  
-	    // assign IP, PORT 
-	    servaddr.sin_family = AF_INET; 
-	    servaddr.sin_addr.s_addr = htonl(INADDR_ANY); 
-	    servaddr.sin_port = htons(serverPort); 
+	    bzero(&servaddr, sizeof(servaddr));
 
-	     // Binding newly created socket to given IP and verification 
-	    if ((bind(sockfd, (SOCKET*)&servaddr, sizeof(servaddr))) != 0) { 
-	        printf("socket bind failed...\n"); 
-	        exit(0); 
+	    // assign IP, PORT
+	    servaddr.sin_family = AF_INET;
+	    servaddr.sin_addr.s_addr = htonl(INADDR_ANY);
+	    servaddr.sin_port = htons(serverPort);
+
+	     // Binding newly created socket to given IP and verification
+	    if ((bind(sockfd, (SOCKET*)&servaddr, sizeof(servaddr))) != 0) {
+	        printf("socket bind failed...\n");
+	        exit(0);
 	    }
 	    else
-	        printf("Socket successfully binded..\n"); 
-	  
-	    // Now server is ready to listen and verification 
-	    if ((listen(sockfd, 1)) != 0) { 
-	        printf("Listen failed...\n"); 
-	        exit(0); 
-	    } 
-	    else
-	        printf("Server listening..\n"); 
-	    len = sizeof(client); 
+	        printf("Socket successfully binded..\n");
 
-	    accept_commands(sockfd,p[1]); 
-	  
-	    // After chatting close the socket 
-	    close(sockfd); 
+	    // Now server is ready to listen and verification
+	    if ((listen(sockfd, 1)) != 0) {
+	        printf("Listen failed...\n");
+	        exit(0);
+	    }
+	    else
+	        printf("Server listening..\n");
+	    len = sizeof(client);
+
+	    accept_commands(sockfd,p[1]);
+
+	    // After chatting close the socket
+	    close(sockfd);
 
     }else{//if child wait parent for commands
     	signal(SIGPIPE, SIG_IGN);
@@ -283,12 +271,12 @@ int main(int argc, char *argv[]) {
     	char **saveptr1, **saveptr2, **saveptr3;
     	const char d[2] = ";",d1[2] = "|",d2[2] = " ";
     	int n,i,flag,package_number;
-    	int sockfd,counter; 
-    	char buffer[UDP_PACKAGE_SIZE],c; 
+    	int sockfd,counter;
+    	char buffer[UDP_PACKAGE_SIZE],c;
     	struct sockaddr_in servaddr;
 
     	FILE *fp;
-    	
+
     	while(1){
     		start:
     		n = 0;
@@ -297,7 +285,7 @@ int main(int argc, char *argv[]) {
     		printf("Process %d ,Gonna block\n",getpid());
     		while ((nbytes = read(p[0], inbuf, PIPE_BUFFER_SIZE)) > 0) {
     			printf("Child %d read %d bytes and says %s\n",getpid(),nbytes, &inbuf[17]);
-            	break; 
+            	break;
     		}
 
     		strncpy(tmp4,&inbuf[17],100);
@@ -338,7 +326,7 @@ int main(int argc, char *argv[]) {
 			token = strtok(tmp3,d1);
 
 			while(token != NULL){
-				
+
 				flag = 0;
 				n = 0;
 				bzero(tmp5,PIPE_BUFFER_SIZE);
@@ -353,7 +341,7 @@ int main(int argc, char *argv[]) {
 					}else if(( token[i] == '\0' || isspace(token[i])) && flag){
 						tmp5[n] = '\0';
 						//printf("==%s\n",tmp5 );
-						//check if command is a supported command 
+						//check if command is a supported command
 						for(int j=0 ; j<5;j++){
 							if(strcmp(tmp5,COMMANDS[j]) == 0){
 								if(finalCmd[0] != '\0'){
@@ -368,7 +356,7 @@ int main(int argc, char *argv[]) {
 						goto execute;
 					}
 
-					
+
 				}
 				con:
 				//printf("FINAL = %s\n",finalCmd );
@@ -395,20 +383,20 @@ int main(int argc, char *argv[]) {
 
 
 		    send:
-  			
-  			if ( (sockfd = socket(AF_INET, SOCK_DGRAM, 0)) < 0 ) { 
-		        perror("socket creation failed"); 
-		        exit(EXIT_FAILURE); 
+
+  			if ( (sockfd = socket(AF_INET, SOCK_DGRAM, 0)) < 0 ) {
+		        perror("socket creation failed");
+		        exit(EXIT_FAILURE);
 		    }
 
-			memset(&servaddr, 0, sizeof(servaddr)); 
-      	
-		    // Filling server information 
-		    servaddr.sin_family = AF_INET; 
-		    servaddr.sin_port = htons(clientPort); 
-		    servaddr.sin_addr.s_addr = INADDR_ANY;  
-		 	
-		    
+			memset(&servaddr, 0, sizeof(servaddr));
+
+		    // Filling server information
+		    servaddr.sin_family = AF_INET;
+		    servaddr.sin_port = htons(clientPort);
+		    servaddr.sin_addr.s_addr = INADDR_ANY;
+
+
 
 		    bzero(buffer,sizeof(buffer));
 		    package_number = 0;
@@ -441,25 +429,25 @@ int main(int argc, char *argv[]) {
 			    		sprintf(tmp2,"%10u",package_number);
 			    		strncpy(&buffer[10],tmp2,10);
 
-			    		sendto(sockfd, (const char *)buffer, strlen(buffer), 
-			       			MSG_CONFIRM, (const struct sockaddr *) &servaddr,  
-			            	sizeof(servaddr)); 
+			    		sendto(sockfd, (const char *)buffer, strlen(buffer),
+			       			MSG_CONFIRM, (const struct sockaddr *) &servaddr,
+			            	sizeof(servaddr));
 			    		//sleep(0.1);
 			    		//printf("message sent %s\n",buffer);
 
 			    		bzero(buffer,sizeof(buffer));
 			    	}
-			    }   				
+			    }
   			}else{
   				c = EOF;
   			}
 
-        		
+
  			if(c == EOF){
  				if(package_number == 0){
- 					sendto(sockfd, (const char *)buffer, strlen(buffer), 
-		        		MSG_CONFIRM, (const struct sockaddr *) &servaddr,  
-		            	sizeof(servaddr)); 
+ 					sendto(sockfd, (const char *)buffer, strlen(buffer),
+		        		MSG_CONFIRM, (const struct sockaddr *) &servaddr,
+		            	sizeof(servaddr));
 		    		//printf("message sent %s\n",buffer);
  				}else{
  					package_number ++;
@@ -469,10 +457,10 @@ int main(int argc, char *argv[]) {
 		    		sprintf(tmp2,"%10u",package_number);
 		    		strncpy(&buffer[10],tmp2,10);
 
-		    		sendto(sockfd, (const char *)buffer, strlen(buffer), 
-		       			MSG_CONFIRM, (const struct sockaddr *) &servaddr,  
-		            	sizeof(servaddr)); 
-		    		
+		    		sendto(sockfd, (const char *)buffer, strlen(buffer),
+		       			MSG_CONFIRM, (const struct sockaddr *) &servaddr,
+		            	sizeof(servaddr));
+
 		    		//printf("message sent %s\n",buffer);
 
 		    		//send the final recognition package
@@ -489,22 +477,22 @@ int main(int argc, char *argv[]) {
 		    		sprintf(tmp2,"%10u",package_number);
 		    		strncpy(&buffer[10],tmp2,10);
 
-		    		sendto(sockfd, (const char *)buffer, strlen(buffer), 
-		       			MSG_CONFIRM, (const struct sockaddr *) &servaddr,  
-		            	sizeof(servaddr)); 
-		    		
-		    		//printf("message sent %s\n",buffer);		    		
+		    		sendto(sockfd, (const char *)buffer, strlen(buffer),
+		       			MSG_CONFIRM, (const struct sockaddr *) &servaddr,
+		            	sizeof(servaddr));
+
+		    		//printf("message sent %s\n",buffer);
 
  				}
 
  			}
-  
+
 		    close(sockfd);
 		    if(fp != NULL){
 		    	pclose(fp);
 		    }
-		    
-        	
+
+
     	}
     }
     fprintf(stderr,"Terminated process with pid : %d  \n", getpid());

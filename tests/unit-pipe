@@ -1,0 +1,4 @@
+cat -T ./tests/unit-pipe | grep command
+grep command ./tests/unit-pipe
+ls | NOTACOMMAND
+#this is not a command

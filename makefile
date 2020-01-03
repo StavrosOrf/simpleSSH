@@ -3,14 +3,14 @@ CFLAGS=-g
 
 all: remoteServer remoteClient
 
-remoteServer: remoteServer
+remoteServer: remoteServer.c
 	$(CC) $(CFLAGS) -o remoteServer remoteServer.c
 
-remoteClient: remoteClient
+remoteClient: remoteClient.c
 	$(CC) $(CFLAGS) -o remoteClient remoteClient.c
 
 clean :
-	rm *.o output* remoteServer remoteClient 
+	rm *.o output* remoteServer remoteClient *.out
 
 cr:
 	make

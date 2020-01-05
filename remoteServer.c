@@ -133,9 +133,9 @@ void accept_commands(int sockfd,int pipeWrite){
 					int new;
 					size = sizeof(clientname);
 					new = accept(sockfd,(SOCKET*) &clientname,&size);
-
 					if(new < 0)
 						exit(EXIT_FAILURE);
+
 					printf("new Connection %d \n",new);
 					instructionsSent[new] = 0;
 

@@ -16,3 +16,6 @@ cr:
 	make
 	./remoteServer 50000	5
 # 	./remoteClient 127.0.0.0 8080 8082 inputFile1
+
+client:
+	./remoteClient 127.0.0.1 50000 50001 ./tests/unit-test-EOL

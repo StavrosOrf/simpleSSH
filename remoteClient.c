@@ -108,7 +108,6 @@ void sendCommands(int sockfd ,int receivePORT,char* fileName){
 }
 
 int countLines(char* filename){
-
 	int count = 0;
 	char c;
 
@@ -220,7 +219,7 @@ int main(int argc, char *argv[]){
 			strncpy(strPackage ,&buffer[10],10);
 			packageNumber = atoi(strPackage);
 			//generate fileName
-			sprintf(fileName,"output.%d,%d",receivePORT,instrNumber);
+			sprintf(fileName,"output.%d.%d",receivePORT,instrNumber);
 			//printf("Instruction %d packageNumber %d\n",instrNumber, packageNumber );
 			// Package number = 0 means that all output is within one package
 			if(packageNumber == 0){
